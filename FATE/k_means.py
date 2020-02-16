@@ -1,5 +1,6 @@
 from numpy import *
 import matplotlib.pyplot as plt
+import rayleigh
 # import numpy
 
 # 加载本地数据
@@ -87,11 +88,9 @@ def biKmeans(dataSet, k, distMeas=distEclud):
                 centroidMat, splitClustAss = kMeans(ptsInCurrCluster, 2, distMeas)  # 返回中心点信息、该数据集聚类信息
                 # print('ok')
             else:
-                splitClustAss =  mat([1,0])
+                splitClustAss = mat([1, 0])
                 centroidMat = centroid0
-                print('empty')
-
-
+                # print('empty')
 
 
             sseSplit = sum(splitClustAss[:, 1])  # 这是划分数据的SSE
@@ -149,40 +148,97 @@ def b_k_meams_run(clust_num,datMat_temp):
     centList, myNewAssments = biKmeans(datMat_temp, clust_num)
 
     # print(centList)
+    # print(myNewAssments[:,0][1])
 
-    # print(myNewAssments[:,0])
 
-    # fig = plt.figure()
+    # 画图 注释处3   共3处
+    # ax = fig.add_subplot(111)
+    # ax.scatter(centList[:, 0].flatten().A[0], centList[:, 1].flatten().A[0], color='r', s=300, marker='3')
+    # ax.scatter(datMat_temp[:, 0].flatten().A[0], datMat_temp[:, 1].flatten().A[0])
 
-    ax = fig.add_subplot(111)
 
-    ax.scatter(centList[:, 0].flatten().A[0], centList[:, 1].flatten().A[0], color='r', s=300, marker='3')
-
-    ax.scatter(datMat_temp[:, 0].flatten().A[0], datMat_temp[:, 1].flatten().A[0])
-
-    # plt.ion()
-    # plt.show()
-
-    return myNewAssments[:,0]
+    return myNewAssments[:,0], centList
 
 
 
 step_final = random.randint(0,100,[20,2])
-fig = plt.figure()
-plt.xlim(-30, 130)
-plt.ylim(-30, 130)
-plt.ion()
+# 画图 注释处1   共3处
+# fig = plt.figure()
+# plt.ion()
+# plt.show()
 
-for i in range(1000):
-    step_len = random.normal(0,2,[20, 2])
+cluster_membernum = 20
+cluster_num = 3
+for i in range(10):
+    step_len = random.normal(0,2,[cluster_membernum, 2])
     step_final = step_final + step_len
+
+    #此处添加范围限制
+    for border_num in range(20):
+        if step_final[border_num][0] >= 100:
+            step_final[border_num][0] = 100
+        if step_final[border_num][0] <= 0:
+            step_final[border_num][0] = 0
+        if step_final[border_num][1] >= 100:
+            step_final[border_num][1] = 100
+        if step_final[border_num][1] <= 0:
+            step_final[border_num][1] = 0
+
+
+
+    myNewAssments_temp, centList_temp = b_k_meams_run(cluster_num, step_final)
     # print(step_final)
-    # print(step_final)
-    b_k_meams_run(3, step_final)
-    plt.pause(0.5)
-    plt.clf()
-    plt.xlim(-30, 130)
-    plt.ylim(-30, 130)
-    # print(b_k_meams_run(3,ram))
+    # print(myNewAssments_temp)
+    # print(centList_temp)
+
+    # print(type(centList_temp))
+    cluster_array = []
+    threshold_distribute = []
+    common_point_num = []
+    centList_temp_location = []
+
+    # 将每一簇的数据分开
+    for k in range(cluster_num):
+        cluster_temp = [i for i, d in enumerate(myNewAssments_temp) if d == k]
+
+        # 单独处理只有n-1个中心点的情况  n为所分簇的个数
+        if len(cluster_temp):
+            cluster_array.append(cluster_temp)
+            common_point_num.append(1) # 对应P数目  P点放最后
+            threshold_distribute.append(rayleigh.threshold90)
+            centList_temp_location.append(k)
+        else:
+            delete(centList_temp, k, axis=1)
+            # print(centList_temp)
+            # 缺少中心点时加入空数组以保证索引值不变
+            cluster_array.append([])
+            # print('empty')
+            continue
+
+    # 计算各个移动端到达中心点的距离
+    # print(array(centList_temp_location))
+    # print(cluster_array)
+    dist_cluster_array = []
+    dist_array = []
+    for p in array(centList_temp_location):
+        dist_cluster_array = []
+        for q in cluster_array[p]:
+            # print(cluster_array[p])
+            dist_cluster_array.append(distEclud(step_final[q], centList_temp[p]))
+            # print(dist_cluster_array)
+        dist_array.append(dist_cluster_array)
+    # print(dist_array)
+
+
+    # print(cluster_array)
+    # print(common_point)
+    # print(threshold_distribute)
+
+    # 画图 注释处2   共两处
+    # plt.pause(0.5)
+    # plt.clf()
+
+
+
 
 

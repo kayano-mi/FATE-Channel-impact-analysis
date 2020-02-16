@@ -1,6 +1,7 @@
 from __future__ import absolute_import, division, print_function
 import rayleigh
 import os
+import k_means
 
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = '3' # 只显示 Error
 os.environ["CUDA_VISIBLE_DEVICES"] = "0"
@@ -168,7 +169,8 @@ def federated_eval(model, data):
     return tff.federated_mean(
         tff.federated_map(local_eval, [tff.federated_broadcast(model), data]))
 
-def cluster_train(roc, threshold,train_data,model,length,common_point,Interface):
+# roc
+def cluster_train(roc, threshold,train_data,model,length,common_point_num,Interface):
     # 下面开始真正的fed训练
     # model = initial_model
     learning_rate = 0.1
@@ -178,8 +180,10 @@ def cluster_train(roc, threshold,train_data,model,length,common_point,Interface)
         client_model = federated_model(model, learning_rate, train_data)
         # print(client_model[3])
 
-        channel = rayleigh.Rayleigh_2(7850,threshold,1,length-common_point)
-        for i in range(length-common_point):
+        channel = rayleigh.Rayleigh_2(7850,threshold,1,length-common_point_num)
+
+        # 如果数组为空，直接跳过，所以允许有空数组存在
+        for i in range(length-common_point_num):
             for j in range(784):
                 for k in range(10):
                     num = (j - 1) * 10 + k - 1
@@ -189,14 +193,14 @@ def cluster_train(roc, threshold,train_data,model,length,common_point,Interface)
         model = federated_mean(client_model)
 
         # 取平均
-        map_sum = rayleigh.Rayleigh_3(channel,length-common_point)
+        map_sum = rayleigh.Rayleigh_3(channel,length-common_point_num)
         for j in range(784):
             for k in range(10):
                 num = (j - 1) * 10 + k - 1
-                temp1 = length / (map_sum[num] + common_point)
+                temp1 = length / (map_sum[num] + common_point_num)
                 model.weights[j][k] = model.weights[j][k] * temp1
         for l in range(10):
-            temp2 = length / (map_sum[7840 + l] + common_point)
+            temp2 = length / (map_sum[7840 + l] + common_point_num)
             model.bias[l
             ] = model.bias[l] * temp2
     # learning_rate = learning_rate*0.9
@@ -205,8 +209,7 @@ def cluster_train(roc, threshold,train_data,model,length,common_point,Interface)
 federated_train_data_sum = [get_data_for_digit(mnist_train, d) for d in range(10)]
 
 Interface = [[9, 6, 7, 8, 5], [6, 4, 3], [1, 2, 4, 0]]  # P点放最后
-common_point = [1, 1, 1]   #对应P数目  P点放最后
-threshold_distribute = [rayleigh.threshold90,rayleigh.threshold90,rayleigh.threshold90]
+
 
 federated_train_data = []
 
@@ -218,9 +221,18 @@ for i in range(len(Interface)):
 # model_final = cluster_train(1, rayleigh.threshold100, federated_train_data[0], initial_model, len(Interface[0]),common_point[0])
 model_final = initial_model
 for i in range(100):
+    # 读取 k-means 函数里的分组数
     for j in range(len(Interface)):
-        model_final = cluster_train(1, threshold_distribute[j], federated_train_data[j], model_final, len(Interface[j]),
-                                    common_point[j],Interface)
+        '''
+         k_means.threshold_distribute[j]  每个组对应的瑞利门限值
+         federated_train_data[j]  分类后 各个点对应的数据集
+         model_final  更新的模型
+         len(Interface[j])    经过k-means分类后 每组成员个数  为0 表示跳过当前分组
+         k_means.common_point_num[j] 每组的中心点数  暂定都为1
+         Interface 分组结果       
+        '''
+        model_final = cluster_train(1, k_means.threshold_distribute[j], federated_train_data[j], model_final, len(Interface[j]),
+                                    k_means.common_point_num[j],Interface)
         loss = federated_eval(model_final, federated_train_data_sum)
     print('{}'.format(loss))
 
